@@ -8,37 +8,37 @@ import torchvision.transforms as transforms
 from imageio import imread
 from scipy.ndimage.morphology import distance_transform_edt as dte 
 
-class nuclei_dataset_gen(torch.utils.data.Dataset):
-    def __init__(self, main_path='../data/stage1_train/', transform=None):
+class nuclei_dataset(torch.utils.data.Dataset):
+    def __init__(self, main_path='../data/stage1_train/', transform=None, train=True):
+        super(nuclei_dataset, self).__init__()
         self.main_path = main_path
         self.augmentation = augmentation
-        self.df = nuclei_dataset(self.main_path)
-        
-        if transforms is None: 
-            self.transforms = transforms.Compose([
-                            transforms.ToPILImage(),
-                            transforms.Grayscale(),
-                            transforms.RandomCrop(256),
-                            transforms.RandomHorizontalFlip(),
-                            transforms.RandomVerticalFlip(),
-                            transforms.ToTensor(),
-                            transforms.Normalize(0, 255)
-                            ])
-        else:
-            self.transforms = transform
+        self.df = nuclei_dataset_gen(self.main_path)
+        self.train = train
+        self.transforms = transform
         
     def __getitem__(self, n):
-        input = self.transforms(self.df['im'][n])
-        target = self.transforms(self.df['mask'][n])
-        weight = self.transforms(self.df['weight'][n])
+        if not self.train:
+            n = self.__len__() - 1 -n
+        input = self.df['im'][n]
+        target = self.df['mask'][n]
+        weight = self.df['weight'][n]
+        if self.transform is not None:
+            input = self.transforms(input)
+            target = self.transforms(target)
+            weight = self.transforms(weight)
         
         return input, target, weight
         
     def __len__(self):
-        return len(self.df.index)
+        n = len(self.df.index)
+        if self.train: n = n * 0.8
+        else: n = n * 0.2
+        
+        return int(n)
 #
 
-def nuclei_dataset(main_path='../data/stage1_train/'):
+def nuclei_dataset_gen(main_path='../data/stage1_train/'):
     df = get_im_paths(main_path)
     df['mask'] = None
     df['weight'] = None

@@ -6,5 +6,5 @@ def weighted_bce_loss_with_logits(output, target, weight):
     loss = input - input * target + max_val + ((-max_val).exp() + (-input - max_val).exp()).log()
     weighted_loss = loss * weight
     
-    return weighted_loss
+    return weighted_loss.mean()
 #

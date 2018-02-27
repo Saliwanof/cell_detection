@@ -3,49 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Conv2d, ReLU, MaxPool2d, ConvTranspose2d
 
-#
-''' keras version
-
-import keras
-from keras import backend as K
-from keras.layers import Input, concatenate, Conv2D, Conv2DTranspose, MaxPooling2D, Dropout
-from keras.optimizers import Adam
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler
-from keras import metrics
-
-class u_net(object):
-    def __init__(self):
-        pass
-    
-    def get_model(self, height=256, width=256, channel=1):
-        im_input = Input((height, width, channel)) # size (256, 256, 1)
-        wt_input = Input((height, width, channel))
-        
-        conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(im_input)
-        conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv1)
-        pool1 = MaxPooling2D()(conv1) # size (128, 128, 64)
-        
-        conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool1)
-        conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv2)
-        pool2 = MaxPooling2D()(conv2) # size (64, 64, 128)
-        
-        conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool2)
-        conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv3)
-        pool3 = MaxPooling2D()(conv3) # size (32, 32, 256)
-        
-        conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool3)
-        conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv4)
-        pool4 = MaxPooling2D()(conv4) # size (16, 16, 512)
-        
-        conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool4)
-        conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv5)
-        
-        upconv1 = concatenate([Conv2DTranspose(512, 4, strides = 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv5), conv4], axis = 3)
-        conv6 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')
-        
-'''        
-#
-
 class u_net(nn.Module):
     def __init__(self, nf=64, nc=1, img_h=256, img_w=256):
         super(u_net, self).__init__()
@@ -101,6 +58,48 @@ class u_net(nn.Module):
                 init_func(m)
 #
 
+#
+''' keras version
+
+import keras
+from keras import backend as K
+from keras.layers import Input, concatenate, Conv2D, Conv2DTranspose, MaxPooling2D, Dropout
+from keras.optimizers import Adam
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler
+from keras import metrics
+
+class u_net(object):
+    def __init__(self):
+        pass
+    
+    def get_model(self, height=256, width=256, channel=1):
+        im_input = Input((height, width, channel)) # size (256, 256, 1)
+        wt_input = Input((height, width, channel))
+        
+        conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(im_input)
+        conv1 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv1)
+        pool1 = MaxPooling2D()(conv1) # size (128, 128, 64)
+        
+        conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool1)
+        conv2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv2)
+        pool2 = MaxPooling2D()(conv2) # size (64, 64, 128)
+        
+        conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool2)
+        conv3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv3)
+        pool3 = MaxPooling2D()(conv3) # size (32, 32, 256)
+        
+        conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool3)
+        conv4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv4)
+        pool4 = MaxPooling2D()(conv4) # size (16, 16, 512)
+        
+        conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(pool4)
+        conv5 = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv5)
+        
+        upconv1 = concatenate([Conv2DTranspose(512, 4, strides = 2, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(conv5), conv4], axis = 3)
+        conv6 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')
+        
+'''        
+#
 
 
 
