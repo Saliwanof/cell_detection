@@ -1,12 +1,44 @@
 import pathlib
 import imageio
 import scipy
+import torch
 import numpy as np
 import pandas as pd
+import torchvision.transforms as transforms
 from imageio import imread
 from scipy.ndimage.morphology import distance_transform_edt as dte 
 
-def nuclei_dataset(main_path='./data/stage1_train/'):
+class nuclei_dataset_gen(torch.utils.data.Dataset):
+    def __init__(self, main_path='../data/stage1_train/', transform=None):
+        self.main_path = main_path
+        self.augmentation = augmentation
+        self.df = nuclei_dataset(self.main_path)
+        
+        if transforms is None: 
+            self.transforms = transforms.Compose([
+                            transforms.ToPILImage(),
+                            transforms.Grayscale(),
+                            transforms.RandomCrop(256),
+                            transforms.RandomHorizontalFlip(),
+                            transforms.RandomVerticalFlip(),
+                            transforms.ToTensor(),
+                            transforms.Normalize(0, 255)
+                            ])
+        else:
+            self.transforms = transform
+        
+    def __getitem__(self, n):
+        input = self.transforms(self.df['im'][n])
+        target = self.transforms(self.df['mask'][n])
+        weight = self.transforms(self.df['weight'][n])
+        
+        return input, target, weight
+        
+    def __len__(self):
+        return len(self.df.index)
+#
+
+def nuclei_dataset(main_path='../data/stage1_train/'):
     df = get_im_paths(main_path)
     df['mask'] = None
     df['weight'] = None
