@@ -28,7 +28,7 @@ class nuclei_dataset(torch.utils.data.Dataset):
         input = np.array(self.df['im'][n])
         input = transforms.Compose([transforms.ToPILImage(),
                                     transforms.Grayscale(),
-                                    transforms.ToTensor(),
+                                    transforms.Lambda(lambda x: np.array(x) / 255.),
                                     transforms.Lambda(conditioned_inverse)
                                     ])(input) # np.ndarray
         target = np.array(self.df['mask'][n])
@@ -81,17 +81,17 @@ def get_im_paths(main_path):
 
 def make_mask_and_wt(mask_paths, sigma=5):
     sample = imread(mask_paths[0])
-    img_h, img_w = sample.shape
     
-    mask = np.empty((img_h, img_w))
-    dist = np.empty((img_h, img_w))
+    mask = np.zeros_like(sample)
+    dist = np.full_like(sample, np.inf)
     
     for mask_path in mask_paths:
         
-        mask_ = imread(mask_path)
-        mask_[np.isnan(mask_)] = 0
+        mask_ = np.array(imread(mask_path))
+        # mask_[np.isnan(mask_)] = 0
         mask_ = np.where(mask_, 1, 0)
         mask = np.logical_or(mask_, mask)
+        mask = np.where(mask, 1, 0)
         
         dist_ = dte(mask_) + dte(1 - mask_)
         dist = np.dstack((dist, dist_))
@@ -99,7 +99,8 @@ def make_mask_and_wt(mask_paths, sigma=5):
     
     dist_large_value_idx = dist > 10
     dist[dist_large_value_idx] = 0
-    weight = get_weight_c(mask) + np.where(dist_large_value_idx, .003, 10 * np.exp(-2 * np.power(dist, 2) / np.power(sigma, 2)))
+    weight = np.where(dist_large_value_idx, .003, 10 * np.exp(-2 * np.power(dist, 2) / np.power(sigma, 2)))
+    weight = get_weight_c(mask) + np.where(np.isnan(weight), 1, weight)
     
     return mask, weight
 
@@ -107,9 +108,9 @@ def get_weight_c(mask):
     total_count = mask.size
     class1_count = np.count_nonzero(mask)
     class0_count = total_count - class1_count
-    class1_weight = total_count * .5 / class1_count
+    class1_weight = total_count * 5 / class1_count
     try:
-        class0_weight = total_count * .5 / class0_count
+        class0_weight = total_count * 5 / class0_count
     except:
         warnings.warn("class_0 count zero!")
         class0_weight = 0
