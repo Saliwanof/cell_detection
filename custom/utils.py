@@ -5,9 +5,13 @@ from torchvision.transforms import ToPILImage
 
 def conditioned_inverse(im):
     im = np.array(im)
-    is_brightfield = np.mean(im) < 0.45
-    if is_brightfield: im = 1 - im
+    not_brightfield = np.mean(im) < 0.45
+    if not_brightfield: im = 1 - im
     # im = torch.from_numpy(np.expand_dims(im, axis=0))
+    imin, imax = np.amin(im), np.amax(im)
+    k = 1. / (imax - imin)
+    b = imin / (imin - imax)
+    im = k * im + b
     
     return im
 
@@ -24,3 +28,14 @@ def random_crop(im, output_size=256, pad_value=0):
     im = im[i:i+th, j:j+tw]
     
     return im.astype(float)
+    
+def get_weight_c(mask, factor01=(.5, .5)):
+    total_count = mask.size
+    class1_count = np.count_nonzero(mask)
+    class0_count = total_count - class1_count
+    class1_weight = total_count * factor[1] / class1_count
+    class0_weight = total_count * factor[0] / class0_count
+    
+    weight_c = np.where(mask, class1_weight, class0_weight)
+    
+    return weight_c
