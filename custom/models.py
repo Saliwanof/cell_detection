@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import Conv2d, ReLU, MaxPool2d, ConvTranspose2d, Sigmoid
+from torch.nn import Conv2d, ReLU, MaxPool2d, AvgPool2d, ConvTranspose2d, Upsample, Sigmoid
 from torch.nn import BatchNorm2d as Norm2d
 from torch.nn import Parameter
 
@@ -12,36 +12,26 @@ class seg_net(nn.Module):
         self.nf = nf
         self.nc = nc
         
-        self.conv1_3 = Conv2d(nc,   nf, 3, 1, 1, bias=True)
-        self.conv1_5 = Conv2d(nc,   nf, 5, 1, 2, bias=True)
-        self.conv1_7 = Conv2d(nc, 2*nf, 7, 1, 3, bias=True)
-        self.norm1 = Norm2d(4*nf+1)
+        self.conv_block_1 = conv357_block(1, 64, True)
+        self.conv_block_2 = conv357_block(3*64, 32, True)
+        self.conv_block_3 = conv357_block(3*32, 16, True)
+        self.conv_block_4 = conv357_block(3*16, 1, True)
+        self.conv5 = Conv2d(3, 1, 1, 1, 0, bias=True)
         
-        self.conv2_1 = Conv2d(4*nf+1, 1, 1, 1, 0, bias=True)
-        self.conv2_3 = Conv2d(4*nf+1, 1, 3, 1, 1, bias=True)
-        self.conv2_5 = Conv2d(4*nf+1, 1, 5, 1, 2, bias=True)
-        self.conv2_7 = Conv2d(4*nf+1, 1, 7, 1, 3, bias=True)
-        self.norm2 = Norm2d(4)
-        
-        self.conv3 = Conv2d(4, 1, 1, 1, 0, bias=True)
-        
-        self.weights_init()
+        torch.nn.init.xavier_uniform(self.conv5.weight)
         
     def forward(self, x):
-        conv1_3 = self.conv1_3(x)
-        conv1_5 = self.conv1_5(x)
-        conv1_7 = self.conv1_7(x)
-        conv1 = torch.cat((x, conv1_3, conv1_5, conv1_7), dim=1)
-        conv1 = self.norm1(conv1)
+        original_size = tuple(x.size())[2:]
         
-        conv2_1 = self.conv2_1(conv1)
-        conv2_3 = self.conv2_3(conv1)
-        conv2_5 = self.conv2_5(conv1)
-        conv2_7 = self.conv2_7(conv1)
-        conv2 = torch.cat((conv2_1, conv2_3, conv2_5, conv2_7), dim=1)
-        conv2 = self.norm2(conv2)
+        conv1 = self.conv_block_1(x)
+        pool1 = AvgPool2d(2)(conv1)
+        conv2 = self.conv_block_2(pool1)
+        unpool1 = Upsample(size=original_size, mode='bilinear')(conv2)
+        conv3 = self.conv_block_3(unpool1)
+        conv4 = self.conv_block_4(conv3)
+        conv5 = self.conv5(conv4)
         
-        output = Sigmoid()(self.conv3(conv2))
+        output = Sigmoid()(conv5)
         
         return output
     
@@ -79,8 +69,8 @@ class pixelwise_SVM(nn.Module):
     def forward(self, x):
         # x size BCHW
         x = x.permute(0, 2, 3, 1)
-        RBF_output = torch.sum(x.add_(self.RBF_bias).pow_(2), 3, True).div_(self.RBF_scale.pow(2)).mul_(-1).exp_()
-        SVM_output = RBF_output.mul_(self.SVM_scale).add(self.SVM_bias)
+        RBF_output = torch.sum(x.add(self.RBF_bias).pow(2), 3, True).div(self.RBF_scale.pow(2)).mul(-1).exp()
+        SVM_output = RBF_output.mul(self.SVM_scale).add(self.SVM_bias)
         SVM_output = SVM_output.permute(0, 3, 1, 2)
         
         return SVM_output
@@ -89,30 +79,32 @@ class pixelwise_SVM(nn.Module):
         for para in self.parameters():
             init_func(para)
 
-class conv1357_block(nn.Module):
-    def __init__(self, nc, nf):
-        super(conv1357_block, self).__init__()
+class conv357_block(nn.Module):
+    def __init__(self, nc, nf, norm_flag=True):
+        super(conv357_block, self).__init__()
         
-        self.conv3 = Conv2d(nc,   nf, 3, 1, 1, bias=False)
-        self.conv5 = Conv2d(nc,   nf, 5, 1, 2, bias=False)
-        self.conv7 = Conv2d(nc, 2*nf, 7, 1, 3, bias=False)
+        self.conv3 = Conv2d(nc, nf, 3, 1, 1, bias=True)
+        self.conv5 = Conv2d(nc, nf, 5, 1, 2, bias=True)
+        self.conv7 = Conv2d(nc, nf, 7, 1, 3, bias=True)
         
-        self.norm = Norm2d(4*nf+1)
+        if norm_flag:
+            self.norm_flag = norm_flag
+            self.norm = Norm2d(3*nf)
         
         self.weights_init()
         
     def forward(self, x):
         # x size BCHW
-        conv3 = self.conv3(x)
-        conv5 = self.conv5(x)
-        conv7 = self.conv7(x)
+        conv3 = ReLU(True)(self.conv3(x))
+        conv5 = ReLU(True)(self.conv5(x))
+        conv7 = ReLU(True)(self.conv7(x))
         
-        cat = torch.cat((x, conv3, conv5, conv7), dim=1)
-        norm = self.norm(cat)
+        cat = torch.cat((conv3, conv5, conv7), dim=1)
+        if self.norm_flag: cat = self.norm(cat)
         
-        return norm
+        return cat
 
-    def weights_init(self, init_func=torch.nn.init.xavier_uniform):
+    def weights_init(self, init_func=torch.nn.init.kaiming_uniform):
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
                 init_func(m.weight)
